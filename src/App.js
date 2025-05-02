@@ -44,6 +44,7 @@ const BeamSolver = () => {
   const [result, setResult] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [comparisonResults, setComparisonResults] = useState(null);
 
   // Функция правой части дифференциального уравнения
   const f = (t, x, v, a) => {
@@ -161,56 +162,75 @@ const BeamSolver = () => {
     let x = initialConditions.x;
     let v = initialConditions.v;
     let a = initialConditions.a;
-    
+  
     solution.push({ t, x, v, a });
-
+  
     while (t <= 1) {
-      // Коэффициенты Дормана-Принса 5(4)
       const k1 = h * v;
       const l1 = h * a;
       const m1 = h * f(t, x, v, a) / params.m;
-
-      const k2 = h * (v + l1/5);
-      const l2 = h * (a + m1/5);
-      const m2 = h * f(t + h/5, x + k1/5, v + l1/5, a + m1/5) / params.m;
-
-      const k3 = h * (v + 3*l1/40 + 9*l2/40);
-      const l3 = h * (a + 3*m1/40 + 9*m2/40);
-      const m3 = h * f(t + 3*h/10, x + 3*k1/40 + 9*k2/40, v + 3*l1/40 + 9*l2/40, a + 3*m1/40 + 9*m2/40) / params.m;
-
-      const k4 = h * (v + 44*l1/45 - 56*l2/15 + 32*l3/9);
-      const l4 = h * (a + 44*m1/45 - 56*m2/15 + 32*m3/9);
-      const m4 = h * f(t + 4*h/5, x + 44*k1/45 - 56*k2/15 + 32*k3/9, 
-                        v + 44*l1/45 - 56*l2/15 + 32*l3/9, a + 44*m1/45 - 56*m2/15 + 32*m3/9) / params.m;
-
-      const k5 = h * (v + 19372*l1/6561 - 25360*l2/2187 + 64448*l3/6561 - 212*l4/729);
-      const l5 = h * (a + 19372*m1/6561 - 25360*m2/2187 + 64448*m3/6561 - 212*m4/729);
-      const m5 = h * f(t + 8*h/9, x + 19372*k1/6561 - 25360*k2/2187 + 64448*k3/6561 - 212*k4/729,
-                        v + 19372*l1/6561 - 25360*l2/2187 + 64448*l3/6561 - 212*l4/729, 
-                        a + 19372*m1/6561 - 25360*m2/2187 + 64448*m3/6561 - 212*m4/729) / params.m;
-
-      const k6 = h * (v + 9017*l1/3168 - 355*l2/33 + 46732*l3/5247 + 49*l4/176 - 5103*l5/18656);
-      const l6 = h * (a + 9017*m1/3168 - 355*m2/33 + 46732*m3/5247 + 49*m4/176 - 5103*m5/18656);
-      const m6 = h * f(t + h, x + 9017*k1/3168 - 355*k2/33 + 46732*k3/5247 + 49*k4/176 - 5103*k5/18656,
-                        v + 9017*l1/3168 - 355*l2/33 + 46732*l3/5247 + 49*l4/176 - 5103*l5/18656,
-                        a + 9017*m1/3168 - 355*m2/33 + 46732*m3/5247 + 49*m4/176 - 5103*m5/18656) / params.m;
-
-      const k7 = h * (v + 35*l1/384 + 500*l3/1113 + 125*l4/192 - 2187*l5/6784 + 11*l6/84);
-      const l7 = h * (a + 35*m1/384 + 500*m3/1113 + 125*m4/192 - 2187*m5/6784 + 11*m6/84);
-      
-      // Новые значения (5-го порядка)
-      const xNew = x + 35*k1/384 + 500*k3/1113 + 125*k4/192 - 2187*k5/6784 + 11*k6/84;
-      const vNew = v + 35*l1/384 + 500*l3/1113 + 125*l4/192 - 2187*l5/6784 + 11*l6/84;
-      const aNew = a + 35*m1/384 + 500*m3/1113 + 125*m4/192 - 2187*m5/6784 + 11*m6/84;
-
+  
+      const k2 = h * (v + l1 / 5);
+      const l2 = h * (a + m1 / 5);
+      const m2 = h * f(t + h / 5, x + k1 / 5, v + l1 / 5, a + m1 / 5) / params.m;
+  
+      const k3 = h * (v + 3 * l1 / 40 + 9 * l2 / 40);
+      const l3 = h * (a + 3 * m1 / 40 + 9 * m2 / 40);
+      const m3 = h * f(
+        t + 3 * h / 10,
+        x + 3 * k1 / 40 + 9 * k2 / 40,
+        v + 3 * l1 / 40 + 9 * l2 / 40,
+        a + 3 * m1 / 40 + 9 * m2 / 40
+      ) / params.m;
+  
+      const k4 = h * (v + 44 * l1 / 45 - 56 * l2 / 15 + 32 * l3 / 9);
+      const l4 = h * (a + 44 * m1 / 45 - 56 * m2 / 15 + 32 * m3 / 9);
+      const m4 = h * f(
+        t + 4 * h / 5,
+        x + 44 * k1 / 45 - 56 * k2 / 15 + 32 * k3 / 9,
+        v + 44 * l1 / 45 - 56 * l2 / 15 + 32 * l3 / 9,
+        a + 44 * m1 / 45 - 56 * m2 / 15 + 32 * m3 / 9
+      ) / params.m;
+  
+      const k5 = h * (
+        v + 19372 * l1 / 6561 - 25360 * l2 / 2187 + 64448 * l3 / 6561 - 212 * l4 / 729
+      );
+      const l5 = h * (
+        a + 19372 * m1 / 6561 - 25360 * m2 / 2187 + 64448 * m3 / 6561 - 212 * m4 / 729
+      );
+      const m5 = h * f(
+        t + 8 * h / 9,
+        x + 19372 * k1 / 6561 - 25360 * k2 / 2187 + 64448 * k3 / 6561 - 212 * k4 / 729,
+        v + 19372 * l1 / 6561 - 25360 * l2 / 2187 + 64448 * l3 / 6561 - 212 * l4 / 729,
+        a + 19372 * m1 / 6561 - 25360 * m2 / 2187 + 64448 * m3 / 6561 - 212 * m4 / 729
+      ) / params.m;
+  
+      const k6 = h * (
+        v + 9017 * l1 / 3168 - 355 * l2 / 33 + 46732 * l3 / 5247 + 49 * l4 / 176 - 5103 * l5 / 18656
+      );
+      const l6 = h * (
+        a + 9017 * m1 / 3168 - 355 * m2 / 33 + 46732 * m3 / 5247 + 49 * m4 / 176 - 5103 * m5 / 18656
+      );
+      const m6 = h * f(
+        t + h,
+        x + 9017 * k1 / 3168 - 355 * k2 / 33 + 46732 * k3 / 5247 + 49 * k4 / 176 - 5103 * k5 / 18656,
+        v + 9017 * l1 / 3168 - 355 * l2 / 33 + 46732 * l3 / 5247 + 49 * l4 / 176 - 5103 * l5 / 18656,
+        a + 9017 * m1 / 3168 - 355 * m2 / 33 + 46732 * m3 / 5247 + 49 * m4 / 176 - 5103 * m5 / 18656
+      ) / params.m;
+  
+      // Новые значения
+      const xNew = x + 35 * k1 / 384 + 500 * k3 / 1113 + 125 * k4 / 192 - 2187 * k5 / 6784 + 11 * k6 / 84;
+      const vNew = v + 35 * l1 / 384 + 500 * l3 / 1113 + 125 * l4 / 192 - 2187 * l5 / 6784 + 11 * l6 / 84;
+      const aNew = a + 35 * m1 / 384 + 500 * m3 / 1113 + 125 * m4 / 192 - 2187 * m5 / 6784 + 11 * m6 / 84;
+  
       t += h;
       x = xNew;
       v = vNew;
       a = aNew;
-      
+  
       solution.push({ t, x, v, a });
     }
-    
+  
     return solution;
   };
 
@@ -220,38 +240,72 @@ const BeamSolver = () => {
     
     // Имитация асинхронного вычисления
     setTimeout(() => {
-      let solution;
+      // Решаем всеми тремя методами
+      const rkfSolution = solveRKF(stepSize);
+      const adamsSolution = solveAdams(stepSize);
+      const dpSolution = solveDP(stepSize);
+      
+      // Находим значения при t=1 для каждого метода
+      const findLastPoint = (solution) => solution.find(p => Math.abs(p.t - 1) < stepSize/2);
+      
+      const rkfPoint = findLastPoint(rkfSolution);
+      const adamsPoint = findLastPoint(adamsSolution);
+      const dpPoint = findLastPoint(dpSolution);
+      
+      // Рассчитываем отклонения от эталонного значения (RKF)
+      const calculateDeviation = (value) => {
+        if (!rkfPoint || !value) return null;
+        return Math.abs((value - rkfPoint.x) / rkfPoint.x * 100).toFixed(4);
+      };
+      
+      // Сохраняем результаты сравнения
+      setComparisonResults({
+        stepSize,
+        methods: {
+          rkf: {
+            value: rkfPoint ? rkfPoint.x.toFixed(6) : null,
+            deviation: "0.0000" // эталонный метод
+          },
+          adams: {
+            value: adamsPoint ? adamsPoint.x.toFixed(6) : null,
+            deviation: calculateDeviation(adamsPoint?.x)
+          },
+          dp: {
+            value: dpPoint ? dpPoint.x.toFixed(6) : null,
+            deviation: calculateDeviation(dpPoint?.x)
+          }
+        }
+      });
+      
+      // Подготавливаем данные для графика (текущего выбранного метода)
+      let currentSolution;
       switch(method) {
         case 'rkf':
-          solution = solveRKF(stepSize);
+          currentSolution = rkfSolution;
           break;
         case 'adams':
-          solution = solveAdams(stepSize);
+          currentSolution = adamsSolution;
           break;
         case 'dormand-prince':
-          solution = solveDP(stepSize);
+          currentSolution = dpSolution;
           break;
         default:
-          solution = [];
+          currentSolution = [];
       }
       
-      // Находим значение при t=1
-      const lastPoint = solution.find(p => Math.abs(p.t - 1) < stepSize/2);
-      
-      // Подготавливаем данные для графика
       const chartData = {
-        labels: solution.map(p => p.t.toFixed(3)),
+        labels: currentSolution.map(p => p.t.toFixed(3)),
         datasets: [
           {
             label: 'Отклонение x(t)',
-            data: solution.map(p => p.x),
+            data: currentSolution.map(p => p.x),
             borderColor: 'rgb(75, 192, 192)',
             tension: 0.1
           }
         ]
       };
       
-      setResult(lastPoint ? lastPoint.x : null);
+      setResult(rkfPoint ? rkfPoint.x : null);
       setChartData(chartData);
       setIsCalculating(false);
     }, 100);
@@ -325,9 +379,44 @@ const BeamSolver = () => {
           <h2>Результат:</h2>
           <p>Отклонение при t = 1 с: <strong>{result.toFixed(6)}</strong> м</p>
           
+          {comparisonResults && (
+            <div style={{ marginTop: '20px' }}>
+              <h3>Сравнение методов (при t = 1 с):</h3>
+              <table style={{ borderCollapse: 'collapse', width: '100%', marginTop: '10px' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f2f2f2' }}>
+                    <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Метод</th>
+                    <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Значение x(1)</th>
+                    <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Отклонение от эталона (%)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>Рунге-Кутты-Фельдберга (эталон)</td>
+                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>{comparisonResults.methods.rkf.value}</td>
+                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>{comparisonResults.methods.rkf.deviation}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>Адамса</td>
+                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>{comparisonResults.methods.adams.value}</td>
+                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>{comparisonResults.methods.adams.deviation}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>Дорман-Принс</td>
+                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>{comparisonResults.methods.dp.value}</td>
+                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>{comparisonResults.methods.dp.deviation}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p style={{ marginTop: '10px', fontSize: '0.9em', color: '#666' }}>
+                Шаг интегрирования: {comparisonResults.stepSize}
+              </p>
+            </div>
+          )}
+          
           {chartData && (
             <div style={{ marginTop: '30px' }}>
-              <h3>График отклонения балки:</h3>
+              <h3>График отклонения балки (метод: {method === 'rkf' ? 'Рунге-Кутты-Фельдберга' : method === 'adams' ? 'Адамса' : 'Дорман-Принс'}):</h3>
               <div style={{ height: '400px' }}>
                 <Line 
                   data={chartData} 
