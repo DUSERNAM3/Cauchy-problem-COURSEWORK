@@ -231,9 +231,6 @@ const BeamSolver = () => {
         case 'dormand-prince':
           solution = solveDP(stepSize);
           break;
-        case 'finite-difference':
-          solution = solveFiniteDifference(stepSize);
-          break;
         default:
           solution = [];
       }
