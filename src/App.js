@@ -52,6 +52,7 @@ const BeamSolver = () => {
 
   // Состояния компонента
   const [stepSize, setStepSize] = useState(0.01);
+  const [endTime, setEndTime] = useState(1); // Добавлено состояние для конечного времени
   const [method, setMethod] = useState('rkf');
   const [result, setResult] = useState(null);
   const [chartData, setChartData] = useState(null);
@@ -63,8 +64,8 @@ const BeamSolver = () => {
     return (params.F0 * Math.cos(params.omega * t) - params.k * v - params.c * Math.pow(x, 3));
   };
 
-  // Метод Рунге-Кутты-Фельдберга (5-го порядка)
-  const solveRKF = (h) => {
+  // Модифицированный метод Эйлера (метод Хьюна)
+  const solveModifiedEuler = (h, tEnd) => {
     const solution = [];
     let t = 0;
     let x = initialConditions.x;
@@ -73,7 +74,40 @@ const BeamSolver = () => {
     
     solution.push({ t, x, v, a });
 
-    while (t <= 1) {
+    while (t <= tEnd) {
+      // Первый шаг (прогноз)
+      const a1 = f(t, x, v, a) / params.m;
+      const v1 = v + h * a;
+      const x1 = x + h * v;
+      
+      // Второй шаг (коррекция)
+      const a2 = f(t + h, x1, v1, a1) / params.m;
+      const vNew = v + h * (a + a2) / 2;
+      const xNew = x + h * (v + v1) / 2;
+      const aNew = f(t + h, xNew, vNew, a2) / params.m;
+      
+      t += h;
+      x = xNew;
+      v = vNew;
+      a = aNew;
+      
+      solution.push({ t, x, v, a });
+    }
+    
+    return solution;
+  };
+
+  // Метод Рунге-Кутты-Фельдберга (5-го порядка)
+  const solveRKF = (h, tEnd) => {
+    const solution = [];
+    let t = 0;
+    let x = initialConditions.x;
+    let v = initialConditions.v;
+    let a = initialConditions.a;
+    
+    solution.push({ t, x, v, a });
+
+    while (t <= tEnd) {
       // Коэффициенты для RKF45
       const k1 = h * v;
       const l1 = h * a;
@@ -111,9 +145,6 @@ const BeamSolver = () => {
       const xErr = Math.abs(k1/360 - 128*k3/4275 - 2197*k4/75240 + k5/50 + 2*k6/55);
       const vErr = Math.abs(l1/360 - 128*l3/4275 - 2197*l4/75240 + l5/50 + 2*l6/55);
       
-      // Адаптивный шаг (можно добавить логику адаптации)
-      // Пока просто используем заданный шаг
-      
       t += h;
       x = xNew;
       v = vNew;
@@ -126,9 +157,9 @@ const BeamSolver = () => {
   };
 
   // Метод Адамса (3-го порядка)
-  const solveAdams = (h) => {
+  const solveAdams = (h, tEnd) => {
     // Сначала получаем первые 3 точки методом Рунге-Кутты
-    const startPoints = solveRKF(h).slice(0, 4);
+    const startPoints = solveRKF(h, tEnd).slice(0, 4);
     const solution = [...startPoints];
     
     let t = startPoints[3].t;
@@ -138,7 +169,7 @@ const BeamSolver = () => {
     
     const fValues = startPoints.map(p => f(p.t, p.x, p.v, p.a) / params.m);
     
-    while (t <= 1) {
+    while (t <= tEnd) {
       // Прогноз
       const aPred = a + h*(23*fValues[3] - 16*fValues[2] + 5*fValues[1])/12;
       const vPred = v + h*(23*a - 16*solution[solution.length-2].a + 5*solution[solution.length-3].a)/12;
@@ -168,7 +199,7 @@ const BeamSolver = () => {
   };
 
   // Метод Дормана-Принса (DOPRI5)
-  const solveDP = (h) => {
+  const solveDP = (h, tEnd) => {
     const solution = [];
     let t = 0;
     let x = initialConditions.x;
@@ -177,7 +208,7 @@ const BeamSolver = () => {
   
     solution.push({ t, x, v, a });
   
-    while (t <= 1) {
+    while (t <= tEnd) {
       const k1 = h * v;
       const l1 = h * a;
       const m1 = h * f(t, x, v, a) / params.m;
@@ -248,21 +279,28 @@ const BeamSolver = () => {
 
   // Обработчик нажатия кнопки "Решить"
   const handleSolve = () => {
+    if (stepSize <= 0 || stepSize > 0.5 || endTime <= 0 || endTime > 3) {
+      alert('Недопустимые значения шага или времени!');
+      return;
+    }
+
     setIsCalculating(true);
     
     // Имитация асинхронного вычисления
     setTimeout(() => {
-      // Решаем всеми тремя методами
-      const rkfSolution = solveRKF(stepSize);
-      const adamsSolution = solveAdams(stepSize);
-      const dpSolution = solveDP(stepSize);
+      // Решаем всеми методами
+      const rkfSolution = solveRKF(stepSize, endTime);
+      const adamsSolution = solveAdams(stepSize, endTime);
+      const dpSolution = solveDP(stepSize, endTime);
+      const eulerSolution = solveModifiedEuler(stepSize, endTime);
       
-      // Находим значения при t=1 для каждого метода
-      const findLastPoint = (solution) => solution.find(p => Math.abs(p.t - 1) < stepSize/2);
+      // Находим значения при t=endTime для каждого метода
+      const findLastPoint = (solution) => solution.find(p => Math.abs(p.t - endTime) < stepSize/2);
       
       const rkfPoint = findLastPoint(rkfSolution);
       const adamsPoint = findLastPoint(adamsSolution);
       const dpPoint = findLastPoint(dpSolution);
+      const eulerPoint = findLastPoint(eulerSolution);
       
       // Рассчитываем отклонения от эталонного значения (RKF)
       const calculateDeviation = (value) => {
@@ -273,6 +311,7 @@ const BeamSolver = () => {
       // Сохраняем результаты сравнения
       setComparisonResults({
         stepSize,
+        endTime,
         methods: {
           rkf: {
             value: rkfPoint ? rkfPoint.x.toFixed(6) : null,
@@ -285,6 +324,10 @@ const BeamSolver = () => {
           dp: {
             value: dpPoint ? dpPoint.x.toFixed(6) : null,
             deviation: calculateDeviation(dpPoint?.x)
+          },
+          euler: {
+            value: eulerPoint ? eulerPoint.x.toFixed(6) : null,
+            deviation: calculateDeviation(eulerPoint?.x)
           }
         }
       });
@@ -301,15 +344,20 @@ const BeamSolver = () => {
         case 'dormand-prince':
           currentSolution = dpSolution;
           break;
+        case 'euler':
+          currentSolution = eulerSolution;
+          break;
         default:
           currentSolution = [];
       }
+
+      const filteredSolution = currentSolution.filter(p => p.t <= endTime + stepSize / 10);
       
       const chartData = {
-        labels: currentSolution.map(p => p.t.toFixed(3)),
+        labels: filteredSolution.map(p => p.t.toFixed(3)),
         datasets: [
           {
-            label: 'Отклонение x(t)',
+            label: `Отклонение x(t) (0 ≤ t ≤ ${endTime})`,
             data: currentSolution.map(p => p.x),
             borderColor: 'rgb(75, 192, 192)',
             tension: 0.1
@@ -340,7 +388,7 @@ const BeamSolver = () => {
       
       <div style={{ marginBottom: '20px' }}>
         <h2>Параметры решения:</h2>
-        <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
           <div>
             <label htmlFor="method">Метод: </label>
             <select 
@@ -352,6 +400,7 @@ const BeamSolver = () => {
               <option value="rkf">Рунге-Кутты-Фельдберга</option>
               <option value="adams">Адамса</option>
               <option value="dormand-prince">Дорман-Принс</option>
+              <option value="euler">Модифицированный Эйлер</option>
             </select>
           </div>
           
@@ -361,10 +410,24 @@ const BeamSolver = () => {
               id="step" 
               type="number" 
               min="0.001" 
-              max="0.1" 
+              max="0.5" 
               step="0.001" 
               value={stepSize} 
               onChange={(e) => setStepSize(parseFloat(e.target.value))}
+              style={{ padding: '5px', width: '80px' }}
+            />
+          </div>
+          
+          <div>
+            <label htmlFor="endTime">Конечное время (t): </label>
+            <input 
+              id="endTime" 
+              type="number" 
+              min="0.1" 
+              max="3" 
+              step="0.1" 
+              value={endTime} 
+              onChange={(e) => setEndTime(parseFloat(e.target.value))}
               style={{ padding: '5px', width: '80px' }}
             />
           </div>
@@ -389,16 +452,16 @@ const BeamSolver = () => {
       {result !== null && (
         <div style={{ marginTop: '30px' }}>
           <h2>Результат:</h2>
-          <p>Отклонение при t = 1 с: <strong>{result.toFixed(6)}</strong> м</p>
+          <p>Отклонение при t = {endTime} с: <strong>{result.toFixed(6)}</strong> м</p>
           
           {comparisonResults && (
             <div style={{ marginTop: '20px' }}>
-              <h3>Сравнение методов (при t = 1 с):</h3>
+              <h3>Сравнение методов (при t = {endTime} с):</h3>
               <table style={{ borderCollapse: 'collapse', width: '100%', marginTop: '10px' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f2f2f2' }}>
                     <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Метод</th>
-                    <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Значение x(1)</th>
+                    <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Значение x({endTime})</th>
                     <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Отклонение от эталона (%)</th>
                   </tr>
                 </thead>
@@ -418,6 +481,11 @@ const BeamSolver = () => {
                     <td style={{ border: '1px solid #ddd', padding: '8px' }}>{comparisonResults.methods.dp.value}</td>
                     <td style={{ border: '1px solid #ddd', padding: '8px' }}>{comparisonResults.methods.dp.deviation}</td>
                   </tr>
+                  <tr>
+                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>Модифицированный Эйлер</td>
+                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>{comparisonResults.methods.euler.value}</td>
+                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>{comparisonResults.methods.euler.deviation}</td>
+                  </tr>
                 </tbody>
               </table>
               <p style={{ marginTop: '10px', fontSize: '0.9em', color: '#666' }}>
@@ -428,7 +496,12 @@ const BeamSolver = () => {
           
           {chartData && (
             <div style={{ marginTop: '30px' }}>
-              <h3>График отклонения балки (метод: {method === 'rkf' ? 'Рунге-Кутты-Фельдберга' : method === 'adams' ? 'Адамса' : 'Дорман-Принс'}):</h3>
+              <h3>График отклонения балки (метод: {
+                method === 'rkf' ? 'Рунге-Кутты-Фельдберга' : 
+                method === 'adams' ? 'Адамса' : 
+                method === 'dormand-prince' ? 'Дорман-Принс' : 
+                'Модифицированный Эйлер'
+              }):</h3>
               <div style={{ height: '400px' }}>
                 <Line 
                   data={chartData} 
