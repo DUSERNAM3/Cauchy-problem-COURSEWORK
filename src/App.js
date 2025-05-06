@@ -10,6 +10,8 @@ import {
   Tooltip,
   Legend
 } from 'chart.js';
+import { InlineMath, BlockMath } from 'react-katex';
+import 'katex/dist/katex.min.css';
 
 ChartJS.register(
   CategoryScale,
@@ -315,15 +317,34 @@ const BeamSolver = () => {
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
       <h1>Решение задачи о движении балки</h1>
       
-      <div style={{ marginBottom: '20px' }}>
-        <h2>Уравнение движения:</h2>
-        <p>m·x'''(t) + k·x'(t) + c·x³(t) = F₀·cos(ωt)</p>
-        <p>где m = {params.m}, k = {params.k}, c = {params.c}, F₀ = {params.F0}, ω = {params.omega.toFixed(2)}</p>
+      <div style={{ marginBottom: '25px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '5px' }}>
+        <h2 style={{ color: '#2c3e50', marginBottom: '15px' }}>Уравнение движения:</h2>
+        <BlockMath 
+          math={`m\\frac{d^3x}{dt^3} + k\\frac{dx}{dt} + c x^3(t) = F_0 \\cos(\\omega t)`} 
+          style={{ fontSize: '1.2em' }}
+        />
+        <p style={{ marginTop: '10px' }}>
+          где <InlineMath math={`m = ${params.m}`} />, 
+          <InlineMath math={`k = ${params.k}`} />, 
+          <InlineMath math={`c = ${params.c}`} />, 
+          <InlineMath math={`F_0 = ${params.F0}`} />, 
+          <InlineMath math={`\\omega = ${params.omega.toFixed(2)}`} />
+        </p>
       </div>
       
-      <div style={{ marginBottom: '20px' }}>
-        <h2>Начальные условия:</h2>
-        <p>x(0) = {initialConditions.x}, x'(0) = {initialConditions.v}, x''(0) = {initialConditions.a}</p>
+      <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '5px' }}>
+        <h2 style={{ color: '#2c3e50', marginBottom: '15px' }}>Начальные условия:</h2>
+        <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+          <div>
+            <BlockMath math={`x(0) = ${initialConditions.x}`} />
+          </div>
+          <div>
+            <BlockMath math={`\\left.\\frac{dx}{dt}\\right|_{t=0} = ${initialConditions.v}`} />
+          </div>
+          <div>
+            <BlockMath math={`\\left.\\frac{d^2x}{dt^2}\\right|_{t=0} = ${initialConditions.a}`} />
+          </div>
+        </div>
       </div>
       
       <div style={{ marginBottom: '20px' }}>
