@@ -10,8 +10,18 @@ import {
   Tooltip,
   Legend
 } from 'chart.js';
-import { InlineMath, BlockMath } from 'react-katex';
+
+import katex from 'katex';
 import 'katex/dist/katex.min.css';
+
+function KatexFormula({ tex, displayMode = true }) {
+  const html = katex.renderToString(tex, {
+    throwOnError: false,
+    displayMode,
+  });
+
+  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+}
 
 ChartJS.register(
   CategoryScale,
@@ -316,35 +326,16 @@ const BeamSolver = () => {
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
       <h1>Решение задачи о движении балки</h1>
-      
-      <div style={{ marginBottom: '25px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '5px' }}>
-        <h2 style={{ color: '#2c3e50', marginBottom: '15px' }}>Уравнение движения:</h2>
-        <BlockMath 
-          math={`m\\frac{d^3x}{dt^3} + k\\frac{dx}{dt} + c x^3(t) = F_0 \\cos(\\omega t)`} 
-          style={{ fontSize: '1.2em' }}
-        />
-        <p style={{ marginTop: '10px' }}>
-          где <InlineMath math={`m = ${params.m}`} />, 
-          <InlineMath math={`k = ${params.k}`} />, 
-          <InlineMath math={`c = ${params.c}`} />, 
-          <InlineMath math={`F_0 = ${params.F0}`} />, 
-          <InlineMath math={`\\omega = ${params.omega.toFixed(2)}`} />
-        </p>
+
+      <div style={{ marginBottom: '20px' }}>
+        <h2>Уравнение движения:</h2>
+        <KatexFormula tex={`m \\cdot x'''(t) + k \\cdot x'(t) + c \\cdot x^3(t) = F_0 \\cdot \\cos(\\omega t)`} />
+        <KatexFormula tex={`\\text{где } m = ${params.m},\\ k = ${params.k},\\ c = ${params.c},\\ F_0 = ${params.F0},\\ \\omega = ${params.omega.toFixed(2)}`} />
       </div>
-      
-      <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '5px' }}>
-        <h2 style={{ color: '#2c3e50', marginBottom: '15px' }}>Начальные условия:</h2>
-        <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-          <div>
-            <BlockMath math={`x(0) = ${initialConditions.x}`} />
-          </div>
-          <div>
-            <BlockMath math={`\\left.\\frac{dx}{dt}\\right|_{t=0} = ${initialConditions.v}`} />
-          </div>
-          <div>
-            <BlockMath math={`\\left.\\frac{d^2x}{dt^2}\\right|_{t=0} = ${initialConditions.a}`} />
-          </div>
-        </div>
+
+      <div style={{ marginBottom: '20px' }}>
+        <h2>Начальные условия:</h2>
+        <KatexFormula tex={`x(0) = ${initialConditions.x},\\quad x'(0) = ${initialConditions.v},\\quad x''(0) = ${initialConditions.a}`} />
       </div>
       
       <div style={{ marginBottom: '20px' }}>
