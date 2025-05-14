@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Line } from 'react-chartjs-2';
-import { Decimal } from 'decimal.js';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -14,7 +13,6 @@ import {
 
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
-import { supportsEventListenerOptions } from 'chart.js/helpers';
 
 function KatexFormula({ tex, displayMode = true }) {
   const html = katex.renderToString(tex, {
@@ -28,15 +26,9 @@ function KatexFormula({ tex, displayMode = true }) {
 function validateNumber(input) {
     const regex = /^\d*\.?\d{0,3}$/;
     if (!regex.test(input)) {
-        return false; // Некорректный ввод
+        return false;
     }
-    return true; // Корректный ввод
-}
-
-function isDivisible(b, a) {
-    if (a === 0) return false;
-    const remainder = Math.abs(b % a);
-    return remainder < 1e-10; // Считаем остаток 0, если он очень мал
+    return true;
 }
 
 ChartJS.register(
@@ -52,35 +44,36 @@ ChartJS.register(
 const BeamSolver = () => {
   // Параметры задачи
   const params = {
-    m: 1,      // масса (кг)
-    k: 0.2,    // коэффициент вязкого сопротивления
-    c: 4,      // коэффициент жесткости
-    F0: 1,     // амплитуда внешней силы (Н)
-    omega: 2 * Math.PI // частота (рад/с)
+    m: 1,
+    k: 0.2,
+    c: 4,
+    F0: 1,
+    omega: 2 * Math.PI
   };
 
   // Начальные условия
   const initialConditions = {
-    x: 0.5,    // начальное отклонение (м)
-    v: 0,      // начальная скорость (м/с)
-    a: -1      // начальное ускорение (м/с²)
+    x: 0.5,
+    v: 0,
+    a: -1
   };
 
   // Состояния компонента
   const [stepSize, setStepSize] = useState(0.01);
-  const [endTime, setEndTime] = useState(1); // Добавлено состояние для конечного времени
+  const [endTime, setEndTime] = useState(1);
   const [method, setMethod] = useState('rkf');
   const [result, setResult] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [comparisonResults, setComparisonResults] = useState(null);
+  const [displayedEndTime, setDisplayedEndTime] = useState(endTime);
 
   // Функция правой части дифференциального уравнения
   const f = (t, x, v, a) => {
     return (params.F0 * Math.cos(params.omega * t) - params.k * v - params.c * Math.pow(x, 3));
   };
 
-  // Модифицированный метод Эйлера (метод Хьюна)
+  // Модифицированный метод Эйлера
   const solveModifiedEuler = (h, tEnd) => {
     const solution = [];
     let t = 0;
@@ -91,21 +84,20 @@ const BeamSolver = () => {
     solution.push({ t, x, v, a });
 
     while (t <= tEnd) {
-      // Первый шаг (прогноз)
+      // прогноз
       const a1 = f(t, x, v, a) / params.m;
       const v1 = v + h * a;
       const x1 = x + h * v;
-      
-      // Второй шаг (коррекция)
+
+      // коррекция
       const a2 = f(t + h, x1, v1, a1) / params.m;
       const vNew = v + h * (a + a2) / 2;
       const xNew = x + h * (v + v1) / 2;
-      const aNew = f(t + h, xNew, vNew, a2) / params.m;
-      
+
       t += h;
       x = xNew;
       v = vNew;
-      a = aNew;
+      a = (a1 + a2) / 2; // или a = f(t, xNew, vNew, a2) / params.m;
       
       solution.push({ t, x, v, a });
     }
@@ -114,7 +106,7 @@ const BeamSolver = () => {
   };
 
   // Метод Рунге-Кутты-Фельдберга
-  const solveRKF = (hInit, tEnd, tol = 1e-5) => {
+  const solveRKF = (hInit, tEnd, tol = 1e-6) => {
     const solution = [];
     let t = 0;
     let x = initialConditions.x;
@@ -128,7 +120,7 @@ const BeamSolver = () => {
     solution.push({ t, x, v, a });
 
     while (t < tEnd) {
-      if (t + h > tEnd) h = tEnd - t;  // чтобы не перелететь конец
+      if (t + h > tEnd) h = tEnd - t;  // чтобы не перелететь в конец
 
       // Коэффициенты для RKF45
       const k1 = h * v;
@@ -196,8 +188,8 @@ const BeamSolver = () => {
       }
 
       // Адаптация шага
-      const delta = 0.84 * Math.pow((tol / (err || 1e-10)), 0.25); // добавляем 1e-10 чтобы не было деления на ноль
-      h = h * Math.min(Math.max(delta, 0.1), 4.0); // ограничиваем рост/падение шага
+      const delta = 0.84 * Math.pow((tol / (err || 1e-10)), 0.25); // добавляем 1e-10, чтобы не было деления на ноль
+      h = h * Math.min(Math.max(delta, 0.1), 4.0);
 
       if (h > hMax) h = hMax;
       if (h < hMin) {
@@ -209,25 +201,28 @@ const BeamSolver = () => {
     return solution;
   };
 
-  // Метод Дормана-Принса (DOPRI5)
-  const solveDP = (h, tEnd) => {
+  // Метод Дормана-Принса
+  const solveDP = (hInit, tEnd, tol = 1e-6) => {
     const solution = [];
     let t = 0;
+    let h = hInit;
     let x = initialConditions.x;
     let v = initialConditions.v;
     let a = initialConditions.a;
-  
+
     solution.push({ t, x, v, a });
-  
-    while (t <= tEnd) {
+
+    while (t < tEnd) {
+      if (t + h > tEnd) h = tEnd - t;
+
       const k1 = h * v;
       const l1 = h * a;
       const m1 = h * f(t, x, v, a) / params.m;
-  
+
       const k2 = h * (v + l1 / 5);
       const l2 = h * (a + m1 / 5);
       const m2 = h * f(t + h / 5, x + k1 / 5, v + l1 / 5, a + m1 / 5) / params.m;
-  
+
       const k3 = h * (v + 3 * l1 / 40 + 9 * l2 / 40);
       const l3 = h * (a + 3 * m1 / 40 + 9 * m2 / 40);
       const m3 = h * f(
@@ -236,7 +231,7 @@ const BeamSolver = () => {
         v + 3 * l1 / 40 + 9 * l2 / 40,
         a + 3 * m1 / 40 + 9 * m2 / 40
       ) / params.m;
-  
+
       const k4 = h * (v + 44 * l1 / 45 - 56 * l2 / 15 + 32 * l3 / 9);
       const l4 = h * (a + 44 * m1 / 45 - 56 * m2 / 15 + 32 * m3 / 9);
       const m4 = h * f(
@@ -245,7 +240,7 @@ const BeamSolver = () => {
         v + 44 * l1 / 45 - 56 * l2 / 15 + 32 * l3 / 9,
         a + 44 * m1 / 45 - 56 * m2 / 15 + 32 * m3 / 9
       ) / params.m;
-  
+
       const k5 = h * (
         v + 19372 * l1 / 6561 - 25360 * l2 / 2187 + 64448 * l3 / 6561 - 212 * l4 / 729
       );
@@ -258,7 +253,7 @@ const BeamSolver = () => {
         v + 19372 * l1 / 6561 - 25360 * l2 / 2187 + 64448 * l3 / 6561 - 212 * l4 / 729,
         a + 19372 * m1 / 6561 - 25360 * m2 / 2187 + 64448 * m3 / 6561 - 212 * m4 / 729
       ) / params.m;
-  
+
       const k6 = h * (
         v + 9017 * l1 / 3168 - 355 * l2 / 33 + 46732 * l3 / 5247 + 49 * l4 / 176 - 5103 * l5 / 18656
       );
@@ -271,64 +266,100 @@ const BeamSolver = () => {
         v + 9017 * l1 / 3168 - 355 * l2 / 33 + 46732 * l3 / 5247 + 49 * l4 / 176 - 5103 * l5 / 18656,
         a + 9017 * m1 / 3168 - 355 * m2 / 33 + 46732 * m3 / 5247 + 49 * m4 / 176 - 5103 * m5 / 18656
       ) / params.m;
-  
-      // Новые значения
-      const xNew = x + 35 * k1 / 384 + 500 * k3 / 1113 + 125 * k4 / 192 - 2187 * k5 / 6784 + 11 * k6 / 84;
-      const vNew = v + 35 * l1 / 384 + 500 * l3 / 1113 + 125 * l4 / 192 - 2187 * l5 / 6784 + 11 * l6 / 84;
-      const aNew = a + 35 * m1 / 384 + 500 * m3 / 1113 + 125 * m4 / 192 - 2187 * m5 / 6784 + 11 * m6 / 84;
-  
-      t += h;
-      x = xNew;
-      v = vNew;
-      a = aNew;
-  
-      solution.push({ t, x, v, a });
+
+      const k7 = h * (
+        v + 35 * l1 / 384 + 500 * l3 / 1113 + 125 * l4 / 192 - 2187 * l5 / 6784 + 11 * l6 / 84
+      );
+      const l7 = h * (
+        a + 35 * m1 / 384 + 500 * m3 / 1113 + 125 * m4 / 192 - 2187 * m5 / 6784 + 11 * m6 / 84
+      );
+      const m7 = h * f(
+        t + h,
+        x + 35 * k1 / 384 + 500 * k3 / 1113 + 125 * k4 / 192 - 2187 * k5 / 6784 + 11 * k6 / 84,
+        v + 35 * l1 / 384 + 500 * l3 / 1113 + 125 * l4 / 192 - 2187 * l5 / 6784 + 11 * l6 / 84,
+        a + 35 * m1 / 384 + 500 * m3 / 1113 + 125 * m4 / 192 - 2187 * m5 / 6784 + 11 * m6 / 84
+      ) / params.m;
+
+      // Основное решение 5-го порядка
+      const x5 = x + 35 * k1 / 384 + 500 * k3 / 1113 + 125 * k4 / 192 - 2187 * k5 / 6784 + 11 * k6 / 84;
+      const v5 = v + 35 * l1 / 384 + 500 * l3 / 1113 + 125 * l4 / 192 - 2187 * l5 / 6784 + 11 * l6 / 84;
+      const a5 = a + 35 * m1 / 384 + 500 * m3 / 1113 + 125 * m4 / 192 - 2187 * m5 / 6784 + 11 * m6 / 84;
+
+      // Вспомогательное решение 4-го порядка
+      const x4 = x + 5179 * k1 / 57600 + 7571 * k3 / 16695 + 393 * k4 / 640 - 92097 * k5 / 339200 + 187 * k6 / 2100 + k7 / 40;
+      const v4 = v + 5179 * l1 / 57600 + 7571 * l3 / 16695 + 393 * l4 / 640 - 92097 * l5 / 339200 + 187 * l6 / 2100 + l7 / 40;
+      const a4 = a + 5179 * m1 / 57600 + 7571 * m3 / 16695 + 393 * m4 / 640 - 92097 * m5 / 339200 + 187 * m6 / 2100 + m7 / 40;
+
+      // Оценка ошибки
+      const err = Math.max(Math.abs(x5 - x4), Math.abs(v5 - v4), Math.abs(a5 - a4));
+      const safety = 0.9;
+      const minScale = 0.1;
+      const maxScale = 4.0;
+
+      if (err <= tol) {
+        t += h;
+        x = x5;
+        v = v5;
+        a = a5;
+        solution.push({ t, x, v, a });
+      }
+
+      // Адаптивное изменение шага
+      const scale = safety * Math.pow(tol / (err || 1e-10), 0.2);
+      h *= Math.max(minScale, Math.min(maxScale, scale));
     }
-  
+
     return solution;
   };
 
+
   // Обработчик нажатия кнопки "Решить"
   const handleSolve = () => {
-    if ((stepSize <= 0 || stepSize > 0.5 || endTime <= 0 || endTime > 3) || (validateNumber(stepSize) !== true) || (validateNumber(endTime) !== true) || (stepSize > endTime)) {
+    if ((stepSize <= 0 || stepSize > 0.5 || endTime <= 0 || endTime > 3) || 
+        (validateNumber(stepSize) !== true) || 
+        (validateNumber(endTime) !== true) || 
+        (stepSize > endTime)) {
       alert('Недопустимые значения шага или времени!');
       return;
     }
 
+    setDisplayedEndTime(endTime);
     setIsCalculating(true);
     
-    // Имитация асинхронного вычисления
     setTimeout(() => {
-      // Решаем всеми методами
       const rkfSolution = solveRKF(stepSize, endTime);
       const dpSolution = solveDP(stepSize, endTime);
       const eulerSolution = solveModifiedEuler(stepSize, endTime);
       
-      // Находим значения при t=endTime для каждого метода
-      const findLastPoint = (solution) => solution.find(p => Math.abs(p.t - endTime) < stepSize/2);
+      // Улучшенная функция поиска точки
+      const findLastPoint = (solution) => {
+        const exactPoint = solution.find(p => Math.abs(p.t - endTime) < 1e-10);
+        if (exactPoint) return exactPoint;
+        
+        const pointsBeforeEnd = solution.filter(p => p.t <= endTime);
+        return pointsBeforeEnd[pointsBeforeEnd.length - 1] || null;
+      };
       
       const rkfPoint = findLastPoint(rkfSolution);
       const dpPoint = findLastPoint(dpSolution);
       const eulerPoint = findLastPoint(eulerSolution);
       
-      // Рассчитываем отклонения от эталонного значения (RKF)
       const calculateDeviation = (value) => {
-        if (!rkfPoint || !value) return null;
-        return Math.abs((value - rkfPoint.x) / rkfPoint.x * 100).toFixed(4);
+        if (!dpPoint || !value) return null;
+        return Math.abs((value - dpPoint.x) / dpPoint.x * 100).toFixed(4);
       };
       
-      // Сохраняем результаты сравнения
       setComparisonResults({
         stepSize,
         endTime,
         methods: {
-          rkf: {
-            value: rkfPoint ? rkfPoint.x.toFixed(6) : null,
-            deviation: "0.0000" // эталонный метод
-          },
           dp: {
             value: dpPoint ? dpPoint.x.toFixed(6) : null,
-            deviation: calculateDeviation(dpPoint?.x)
+            deviation: "0.0000"
+          },
+          rkf: {
+            value: rkfPoint ? rkfPoint.x.toFixed(6) : null,
+            deviation: calculateDeviation(rkfPoint?.x)
           },
           euler: {
             value: eulerPoint ? eulerPoint.x.toFixed(6) : null,
@@ -337,37 +368,28 @@ const BeamSolver = () => {
         }
       });
       
-      // Подготавливаем данные для графика (текущего выбранного метода)
+      // Остальной код без изменений...
       let currentSolution;
       switch(method) {
-        case 'rkf':
-          currentSolution = rkfSolution;
-          break;
-        case 'dormand-prince':
-          currentSolution = dpSolution;
-          break;
-        case 'euler':
-          currentSolution = eulerSolution;
-          break;
-        default:
-          currentSolution = [];
+        case 'rkf': currentSolution = rkfSolution; break;
+        case 'dormand-prince': currentSolution = dpSolution; break;
+        case 'euler': currentSolution = eulerSolution; break;
+        default: currentSolution = [];
       }
 
       const filteredSolution = currentSolution.filter(p => p.t <= endTime + stepSize / 10);
       
       const chartData = {
         labels: filteredSolution.map(p => p.t.toFixed(3)),
-        datasets: [
-          {
-            label: `Отклонение x(t) (0 ≤ t ≤ ${endTime})`,
-            data: currentSolution.map(p => p.x),
-            borderColor: 'rgb(75, 192, 192)',
-            tension: 0.1
-          }
-        ]
+        datasets: [{
+          label: `Отклонение x(t) (0 ≤ t ≤ ${endTime})`,
+          data: currentSolution.map(p => p.x),
+          borderColor: 'rgb(87, 36, 255)',
+          tension: 0.1
+        }]
       };
       
-      setResult(rkfPoint ? rkfPoint.x : null);
+      setResult(dpPoint ? dpPoint.x : null);
       setChartData(chartData);
       setIsCalculating(false);
     }, 100);
@@ -453,27 +475,27 @@ const BeamSolver = () => {
       {result !== null && (
         <div style={{ marginTop: '30px' }}>
           <h2>Результат:</h2>
-          <p>Отклонение при t = {endTime} с: <strong>{result.toFixed(6)}</strong> м</p>
+          <p>Отклонение при t = {displayedEndTime} с: <strong>{result.toFixed(6)}</strong> м</p>
           
           {comparisonResults && (
             <div style={{ marginTop: '20px' }}>
-              <h3>Сравнение методов (при t = {endTime} с):</h3>
+              <h3>Сравнение методов (при t = {displayedEndTime} с):</h3>
               <table style={{ borderCollapse: 'collapse', width: '100%', marginTop: '10px' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f2f2f2' }}>
                     <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Метод</th>
-                    <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Значение x({endTime})</th>
+                    <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Значение x({displayedEndTime})</th>
                     <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Отклонение от эталона (%)</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>Рунге-Кутты-Фельдберга (эталон)</td>
+                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>Рунге-Кутты-Фельдберга</td>
                     <td style={{ border: '1px solid #ddd', padding: '8px' }}>{comparisonResults.methods.rkf.value}</td>
                     <td style={{ border: '1px solid #ddd', padding: '8px' }}>{comparisonResults.methods.rkf.deviation}</td>
                   </tr>
                   <tr>
-                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>Дорман-Принс</td>
+                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>Дорман-Принс (эталон)</td>
                     <td style={{ border: '1px solid #ddd', padding: '8px' }}>{comparisonResults.methods.dp.value}</td>
                     <td style={{ border: '1px solid #ddd', padding: '8px' }}>{comparisonResults.methods.dp.deviation}</td>
                   </tr>
