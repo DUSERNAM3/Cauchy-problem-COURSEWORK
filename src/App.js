@@ -97,7 +97,7 @@ const BeamSolver = () => {
       t += h;
       x = xNew;
       v = vNew;
-      a = (a1 + a2) / 2; // или a = f(t, xNew, vNew, a2) / params.m;
+      a = (a1 + a2) / 2;
       
       solution.push({ t, x, v, a });
     }
@@ -331,7 +331,6 @@ const BeamSolver = () => {
       const dpSolution = solveDP(stepSize, endTime);
       const eulerSolution = solveModifiedEuler(stepSize, endTime);
       
-      // Улучшенная функция поиска точки
       const findLastPoint = (solution) => {
         const exactPoint = solution.find(p => Math.abs(p.t - endTime) < 1e-10);
         if (exactPoint) return exactPoint;
@@ -368,7 +367,6 @@ const BeamSolver = () => {
         }
       });
       
-      // Остальной код без изменений...
       let currentSolution;
       switch(method) {
         case 'rkf': currentSolution = rkfSolution; break;
