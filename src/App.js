@@ -100,6 +100,11 @@ const BeamSolver = () => {
   const [isCalculating, setIsCalculating] = useState(false);
   const [comparisonResults, setComparisonResults] = useState(null);
   const [displayedEndTime, setDisplayedEndTime] = useState(endTime);
+  const [allSolutions, setAllSolutions] = useState({
+    rkf: null,
+    dp: null,
+    euler: null
+  });
 
   // Функция правой части дифференциального уравнения
   const f = (t, x, v, a) => {
@@ -351,6 +356,25 @@ const BeamSolver = () => {
     return solution;
   };
 
+  // Создание данных для графика
+  const createChartData = (solution, methodName) => {
+    if (!solution) return null;
+    
+    const filteredSolution = solution.filter(p => p.t <= endTime + stepSize / 10);
+    
+    return {
+      labels: filteredSolution.map(p => p.t.toFixed(3)),
+      datasets: [{
+        label: `${taskConfig.solutionLabel} (${methodName})`,
+        data: filteredSolution.map(p => p.x),
+        borderColor: methodName === 'Рунге-Кутты-Фельдберга' ? 'rgb(255, 99, 132)' :
+                   methodName === 'Дорман-Принс' ? 'rgb(54, 162, 235)' :
+                   'rgb(255, 159, 64)',
+        tension: 0.1
+      }]
+    };
+  };
+
   // Обработчик нажатия кнопки "Решить"
   const handleSolve = () => {
     if ((stepSize <= 0 || stepSize > 0.5 || endTime <= 0 || endTime > 3) || 
@@ -425,6 +449,12 @@ const BeamSolver = () => {
         }]
       };
       
+      setAllSolutions({
+        rkf: rkfSolution,
+        dp: dpSolution,
+        euler: eulerSolution
+      });
+      
       setResult(dpPoint ? dpPoint.x : null);
       setChartData(chartData);
       setIsCalculating(false);
@@ -443,6 +473,7 @@ const BeamSolver = () => {
               setResult(null);
               setChartData(null);
               setComparisonResults(null);
+              setAllSolutions({ rkf: null, dp: null, euler: null });
             }}
             style={{ padding: '5px' }}
         >
@@ -594,6 +625,64 @@ const BeamSolver = () => {
                   }}
                 />
               </div>
+
+              {/* Графики других методов */}
+              {method !== 'rkf' && allSolutions.rkf && (
+                <div style={{ marginTop: '40px' }}>
+                  <h4>График метода Рунге-Кутты-Фельдберга:</h4>
+                  <div style={{ height: '300px' }}>
+                    <Line 
+                      data={createChartData(allSolutions.rkf, 'Рунге-Кутты-Фельдберга')} 
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                          x: { title: { display: true, text: 'Время, с' } },
+                          y: { title: { display: true, text: taskConfig.yLabel } }
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {method !== 'dormand-prince' && allSolutions.dp && (
+                <div style={{ marginTop: '40px' }}>
+                  <h4>График метода Дорман-Принс:</h4>
+                  <div style={{ height: '300px' }}>
+                    <Line 
+                      data={createChartData(allSolutions.dp, 'Дорман-Принс')} 
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                          x: { title: { display: true, text: 'Время, с' } },
+                          y: { title: { display: true, text: taskConfig.yLabel } }
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {method !== 'euler' && allSolutions.euler && (
+                <div style={{ marginTop: '40px' }}>
+                  <h4>График метода Модифицированный Эйлер:</h4>
+                  <div style={{ height: '300px' }}>
+                    <Line 
+                      data={createChartData(allSolutions.euler, 'Модифицированный Эйлер')} 
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                          x: { title: { display: true, text: 'Время, с' } },
+                          y: { title: { display: true, text: taskConfig.yLabel } }
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
