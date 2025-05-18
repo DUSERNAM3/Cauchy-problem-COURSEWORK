@@ -41,7 +41,7 @@ ChartJS.register(
   Legend
 );
 
-// Конфигурация задач
+// Конфиг задач
 const TASKS = {
   beam: {
     title: "Решение задачи о движении планки",
@@ -112,7 +112,7 @@ const BeamSolver = () => {
       return (taskConfig.params.F0 * Math.cos(taskConfig.params.omega * t) - 
               taskConfig.params.k * v - 
               taskConfig.params.c * Math.pow(x, 3));
-    } else { // gyroscope
+    } else { // Вторая задача
       return (-taskConfig.params.alpha * a - 
               taskConfig.params.beta * Math.sin(x)) / taskConfig.params.m;
     }
@@ -356,7 +356,6 @@ const BeamSolver = () => {
     return solution;
   };
 
-  // Создание данных для графика
   const createChartData = (solution, methodName) => {
     if (!solution) return null;
     
@@ -375,7 +374,7 @@ const BeamSolver = () => {
     };
   };
 
-  // Обработчик нажатия кнопки "Решить"
+  // Кнопка "Решить"
   const handleSolve = () => {
     if ((stepSize <= 0 || stepSize > 0.5 || endTime <= 0 || endTime > 3) || 
         (validateNumber(stepSize) !== true) || 
